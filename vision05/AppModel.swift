@@ -10,5 +10,7 @@ class AppModel {
     case open
   }
   var immersiveSpaceState = ImmersiveSpaceState.closed
-  var logs: String = "Init"
+
+  var log1 = ""
+  var log2 = ""
 }

@@ -8,7 +8,8 @@ struct ContentView: View {
   var body: some View {
     VStack {
       ToggleImmersiveSpaceButton()
-      TextEditor(text: .constant(appModel.logs))
+      TextEditor(text: .constant(appModel.log1))
+      TextEditor(text: .constant(appModel.log2))
     }
   }
 }
