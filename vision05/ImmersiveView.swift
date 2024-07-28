@@ -103,6 +103,15 @@ struct ImmersiveView: View {
   }
 
   func createUnits() -> [UnitEntity] {
+    let height: Float
+    if let deviceAnchor = worldTracking.queryDeviceAnchor(atTimestamp: CACurrentMediaTime()) {
+      height = deviceAnchor.originFromAnchorTransform.transpose.columns.3.y
+      print("Device anchor height: \(height)m")
+    } else {
+      height = 1.2
+      print("Failed to get device anchor, default to 1.2m")
+    }
+
     var units: [UnitEntity] = []
     for x in stride(from: -1.0, to: 1.0, by: 2.0/30) {
       for y in stride(from: -1.0, to: 1.0, by: 2.0/20) {
@@ -112,11 +121,10 @@ struct ImmersiveView: View {
         let unit = UnitEntity()
         unit.setPosition(SIMD3<Float>(
           Float(dist * sin(xAngle) * cos(yAngle)),
-          Float(dist * sin(yAngle) + 1.2), // TODO: use device height
+          Float(dist * sin(yAngle)) + height,
           Float(-dist * cos(xAngle) * cos(yAngle))
         ))
         units.append(unit)
-        print(units.count)
       }
     }
     return units
