@@ -11,7 +11,7 @@ struct vision05App: App {
         .padding()
         .environment(appModel)
     }
-    .defaultSize(width: 600, height: 400)
+    .defaultSize(width: 400, height: 600)
 
     ImmersiveSpace(id: appModel.immersiveSpaceID) {
       ImmersiveView()

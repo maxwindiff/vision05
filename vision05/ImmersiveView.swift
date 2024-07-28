@@ -88,7 +88,7 @@ struct ImmersiveView: View {
           updateHandSkeleton(with: update.anchor)
 
           guard let deviceAnchor = worldTracking.queryDeviceAnchor(atTimestamp: CACurrentMediaTime()) else { continue }
-          updateSelectedSpheres(device: deviceAnchor, hand: update.anchor)
+          updateSelectedUnits(device: deviceAnchor, hand: update.anchor)
         }
       }
     }
@@ -108,16 +108,16 @@ struct ImmersiveView: View {
       height = deviceAnchor.originFromAnchorTransform.transpose.columns.3.y
       print("Device anchor height: \(height)m")
     } else {
-      height = 1.2
+      height = 1.3
       print("Failed to get device anchor, default to 1.2m")
     }
 
     var units: [UnitEntity] = []
-    for x in stride(from: -1.0, to: 1.0, by: 2.0/30) {
-      for y in stride(from: -1.0, to: 1.0, by: 2.0/20) {
+    for x in stride(from: -1.0, to: 1.0, by: 2.0/25) {
+      for y in stride(from: -1.0, to: 1.0, by: 2.0/15) {
         let dist = 2.0
-        let xAngle = 90.0 * .pi / 180 * x
-        let yAngle = 50.0 * .pi / 180 * y
+        let xAngle = 70.0 * .pi / 180 * x
+        let yAngle = 40.0 * .pi / 180 * y
         let unit = UnitEntity()
         unit.setPosition(SIMD3<Float>(
           Float(dist * sin(xAngle) * cos(yAngle)),
@@ -130,33 +130,42 @@ struct ImmersiveView: View {
     return units
   }
 
-  func updateSelectedSpheres(device: DeviceAnchor, hand: HandAnchor) {
+  func updateSelectedUnits(device: DeviceAnchor, hand: HandAnchor) {
     if hand.chirality == .left { return } // TODO: Ignore left hand for now
 
-    let devicePosition = device.originFromAnchorTransform.columns.3.xyz
+    var devicePosition = device.originFromAnchorTransform.columns.3.xyz
+    devicePosition.y -= 0.15 // TODO: why is the device position so high?
     let handPosition = hand.originFromAnchorTransform.columns.3.xyz
     let handDirection = normalize(handPosition - devicePosition)
 
     var hits = 0
+    var log2: [String] = []
     for unit in units {
       let unitDirection = normalize(unit.position - devicePosition)
 
       let angle = acos(dot(handDirection, unitDirection))
-      if angle < 25.0 * .pi / 180 {  // TODO: use size of hand
+      let hit = angle < 20.0 * .pi / 180  // TODO: use size of hand
+      if hit {
         hits += 1
         unit.highlight()
+        log2.append(String(format: "(% .2f, % .2f, % .2f)",
+                           unitDirection.x, unitDirection.y, unitDirection.z))
       } else {
         unit.unhighlight()
       }
     }
 
-    appModel.log2 = String(format: """
-Device position: (% .3f, % .3f, % .3f)
-Hand position: (% .3f, % .3f, % .3f)
+    appModel.log1 = String(format: """
+Device position: (% .2f, % .2f, % .2f)
+Hand position: (% .2f, % .2f, % .2f)
+Hand direction: (% .2f, % .2f, % .2f) 
 Hits: %d
 """,
                            devicePosition.x, devicePosition.y, devicePosition.z,
-                           handPosition.x, handPosition.y, handPosition.z, hits)
+                           handPosition.x, handPosition.y, handPosition.z,
+                           handDirection.x, handDirection.y, handDirection.z,
+                           hits)
+    appModel.log2 = log2.joined(separator: "\n")
   }
 }
 

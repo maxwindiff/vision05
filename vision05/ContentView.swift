@@ -9,7 +9,9 @@ struct ContentView: View {
     VStack {
       ToggleImmersiveSpaceButton()
       TextEditor(text: .constant(appModel.log1))
+        .frame(maxHeight: 100)
       TextEditor(text: .constant(appModel.log2))
+        .frame(maxHeight: .infinity)
     }
   }
 }
