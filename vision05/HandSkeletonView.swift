@@ -34,25 +34,25 @@ class HandSkeletonView: RealityKit.Entity {
     (.littleFingerIntermediateTip, .littleFingerTip),
   ]
 
-  let jointColor: UIColor
-  let connectionColor: UIColor
-
   private var jointEntities: [HandSkeleton.JointName: Entity] = [:]
   private var connectionEntities: [Entity] = []
 
   required init(jointColor: UIColor, connectionColor: UIColor) {
-    self.jointColor = jointColor
-    self.connectionColor = connectionColor
-
     super.init()
 
     for joint in HandSkeleton.JointName.allCases {
-      let jointEntity = createJointEntity()
+      let jointEntity = ModelEntity(
+        mesh: MeshResource.generateBox(size: 0.01),
+        materials: [SimpleMaterial(color: jointColor, isMetallic: false)]
+      )
       jointEntities[joint] = jointEntity
       addChild(jointEntity)
     }
     for _ in connectionPairs {
-      let connection = createConnectionEntity()
+      let connection = ModelEntity(
+        mesh: MeshResource.generateCylinder(height: 1, radius: 0.002),
+        materials: [SimpleMaterial(color: connectionColor, isMetallic: false)]
+      )
       connectionEntities.append(connection)
       addChild(connection)
     }
@@ -60,20 +60,6 @@ class HandSkeletonView: RealityKit.Entity {
 
   @MainActor @preconcurrency required init() {
     fatalError("init() has not been implemented")
-  }
-
-  private func createJointEntity() -> Entity {
-    return ModelEntity(
-      mesh: MeshResource.generateBox(size: 0.01),
-      materials: [SimpleMaterial(color: jointColor, isMetallic: false)]
-    )
-  }
-
-  private func createConnectionEntity() -> Entity {
-    return ModelEntity(
-      mesh: MeshResource.generateCylinder(height: 1, radius: 0.002),
-      materials: [SimpleMaterial(color: connectionColor, isMetallic: false)]
-    )
   }
 
   func updateHandSkeleton(with handAnchor: HandAnchor) {
@@ -90,13 +76,14 @@ class HandSkeletonView: RealityKit.Entity {
         continue
       }
 
+      let connectionEntity = connectionEntities[index]
       let startPosition = Transform(matrix: handAnchor.originFromAnchorTransform *
                                     startJoint.anchorFromJointTransform).translation
       let endPosition = Transform(matrix: handAnchor.originFromAnchorTransform *
                                   endJoint.anchorFromJointTransform).translation
-      let connectionEntity = connectionEntities[index]
       connectionEntity.position = (startPosition + endPosition) / 2
 
+      // Rotate cylinder to match the skeleton orientation and length
       let dir = endPosition - startPosition
       let len = length(dir)
       let normalizedDir = dir / len
