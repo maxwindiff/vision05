@@ -103,14 +103,7 @@ struct ImmersiveView: View {
   }
 
   func createUnits() -> [UnitEntity] {
-    let height: Float
-    if let deviceAnchor = worldTracking.queryDeviceAnchor(atTimestamp: CACurrentMediaTime()) {
-      height = deviceAnchor.originFromAnchorTransform.transpose.columns.3.y
-      print("Device anchor height: \(height)m")
-    } else {
-      height = 1.3
-      print("Failed to get device anchor")
-    }
+    let height: Float = 1.3  // TODO: use device anchor
 
     var units: [UnitEntity] = []
     for x in stride(from: -1.0, to: 1.0, by: 2.0/25) {
