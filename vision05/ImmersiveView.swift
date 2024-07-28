@@ -17,12 +17,14 @@ class UnitEntity: RealityKit.Entity {
       mesh: .generatePlane(width: 0.15, height: 0.02),
       materials: [SimpleMaterial(color: .white, isMetallic: false)]
     )
+    placard.orientation = simd_quatf(angle: .pi, axis: [0, 1, 0])
     placard.position.y = -0.04
     addChild(model)
     addChild(placard)
   }
 
   func displayPosition() {
+    // TODO: use TextComponent?
     placard.model?.materials = [renderToMaterial(text: String(format: "(%.2f, %.2f, %.2f)",
                                                               position.x, position.y, position.z))]
   }
