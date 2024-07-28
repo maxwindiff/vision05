@@ -8,13 +8,5 @@
 def Xform "Root"
 {
     reorder nameChildren = ["Sphere_Left", "Sphere_Right", "GridMaterial"]
-    def "Radiant_Pillar" (
-        active = true
-        prepend references = @Radiant_Pillar.usdz@
-    )
-    {
-        float3 xformOp:scale = (0.01, 0.01, 0.01)
-        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
-    }
 }
 

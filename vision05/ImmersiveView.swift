@@ -22,8 +22,7 @@ class UnitEntity: RealityKit.Entity {
     addChild(placard)
   }
 
-  func setPosition(_ position: SIMD3<Float>) {
-    setPosition(position, relativeTo: nil)
+  func displayPosition() {
     placard.model?.materials = [renderToMaterial(text: String(format: "(%.2f, %.2f, %.2f)",
                                                               position.x, position.y, position.z))]
   }
@@ -59,20 +58,28 @@ struct ImmersiveView: View {
   let handTracking = HandTrackingProvider()
   let headAnchor = AnchorEntity(.head)
 
-  @State var leftHand: HandSkeletonView!
-  @State var rightHand: HandSkeletonView!
+  @State var leftHand: HandSkeletonView?
+  @State var rightHand: HandSkeletonView?
   @State var units: [UnitEntity] = []
+  @State var debugCone: Entity?
 
   var body: some View {
     RealityView { content in
       leftHand = HandSkeletonView(jointColor: .red, connectionColor: .red.withAlphaComponent(0.5))
       rightHand = HandSkeletonView(jointColor: .blue, connectionColor: .blue.withAlphaComponent(0.5))
-      content.add(leftHand)
-      content.add(rightHand)
+      content.add(leftHand!)
+      content.add(rightHand!)
 
       units = createUnits()
       for unit in units {
         content.add(unit)
+      }
+
+      do {
+        debugCone = try await Entity(named: "Debug", in: realityKitContentBundle)
+        content.add(debugCone!)
+      } catch {
+        print("Failed to load debugCone", error)
       }
     }
     .task {
@@ -85,20 +92,11 @@ struct ImmersiveView: View {
     .task {
       for await update in handTracking.anchorUpdates {
         if update.event == .updated {
-          updateHandSkeleton(with: update.anchor)
-
           guard let deviceAnchor = worldTracking.queryDeviceAnchor(atTimestamp: CACurrentMediaTime()) else { continue }
+          updateHand(device: deviceAnchor, hand: update.anchor)
           updateSelectedUnits(device: deviceAnchor, hand: update.anchor)
         }
       }
-    }
-  }
-
-  func updateHandSkeleton(with anchor: HandAnchor) {
-    if anchor.chirality == .left {
-      leftHand?.updateHandSkeleton(with: anchor)
-    } else {
-      rightHand?.updateHandSkeleton(with: anchor)
     }
   }
 
@@ -109,7 +107,7 @@ struct ImmersiveView: View {
       print("Device anchor height: \(height)m")
     } else {
       height = 1.3
-      print("Failed to get device anchor, default to 1.2m")
+      print("Failed to get device anchor")
     }
 
     var units: [UnitEntity] = []
@@ -119,15 +117,22 @@ struct ImmersiveView: View {
         let xAngle = 70.0 * .pi / 180 * x
         let yAngle = 40.0 * .pi / 180 * y
         let unit = UnitEntity()
-        unit.setPosition(SIMD3<Float>(
-          Float(dist * sin(xAngle) * cos(yAngle)),
-          Float(dist * sin(yAngle)) + height,
-          Float(-dist * cos(xAngle) * cos(yAngle))
-        ))
+        unit.look(at: [0, height, 0], from: [Float(dist * sin(xAngle) * cos(yAngle)),
+                                             Float(dist * sin(yAngle)) + height,
+                                             Float(-dist * cos(xAngle) * cos(yAngle))], relativeTo: nil)
+        unit.displayPosition()
         units.append(unit)
       }
     }
     return units
+  }
+
+  func updateHand(device: DeviceAnchor, hand: HandAnchor) {
+    if hand.chirality == .left {
+      leftHand?.updateHandSkeleton(with: hand)
+    } else {
+      rightHand?.updateHandSkeleton(with: hand)
+    }
   }
 
   func updateSelectedUnits(device: DeviceAnchor, hand: HandAnchor) {
@@ -138,13 +143,14 @@ struct ImmersiveView: View {
     let handPosition = hand.originFromAnchorTransform.columns.3.xyz
     let handDirection = normalize(handPosition - devicePosition)
 
+    let selectionAngle: Float = 20.0 * .pi / 180  // TODO: use size of hand
     var hits = 0
     var log2: [String] = []
     for unit in units {
       let unitDirection = normalize(unit.position - devicePosition)
 
       let angle = acos(dot(handDirection, unitDirection))
-      let hit = angle < 20.0 * .pi / 180  // TODO: use size of hand
+      let hit = angle < selectionAngle
       if hit {
         hits += 1
         unit.highlight()
@@ -154,6 +160,11 @@ struct ImmersiveView: View {
         unit.unhighlight()
       }
     }
+
+    let coneHeight: Float = 2.0
+    let coneRadius = tan(selectionAngle) * coneHeight
+    debugCone?.look(at: devicePosition + handDirection, from: handPosition, relativeTo: nil)
+    debugCone?.scale = [coneRadius, coneRadius, coneHeight]
 
     appModel.log1 = String(format: """
 Device position: (% .2f, % .2f, % .2f)
