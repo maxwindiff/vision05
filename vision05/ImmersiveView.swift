@@ -53,6 +53,14 @@ class UnitEntity: RealityKit.Entity {
 }
 
 class GestureDetector {
+  private let palmJoints: [HandSkeleton.JointName] = [
+    .wrist,
+    .thumbKnuckle, .thumbIntermediateBase,
+    .indexFingerMetacarpal, .indexFingerKnuckle, .indexFingerIntermediateBase,
+    .middleFingerMetacarpal, .middleFingerKnuckle, .middleFingerIntermediateBase,
+    .ringFingerMetacarpal, .ringFingerKnuckle, .ringFingerIntermediateBase,
+    .littleFingerMetacarpal, .littleFingerKnuckle, .littleFingerIntermediateBase,
+  ]
   private let fingers: [[(HandSkeleton.JointName, HandSkeleton.JointName)]] = [
     [
       (.wrist, .thumbKnuckle),
@@ -86,10 +94,15 @@ class GestureDetector {
     ]
   ]
 
-  func detectSelecting(_ hand: HandAnchor) -> (SIMD3<Float>, SIMD3<Float>, Float, Bool, String) {
-    guard let skeleton = hand.handSkeleton else {
-      return ([0, 0, 0], [0, 0, 0], 0, false, "No skeleton")
-    }
+  func isSelecting(_ device: DeviceAnchor, _ hand: HandAnchor) -> (
+    centroid: SIMD3<Float>,
+    normal: SIMD3<Float>,
+    angle: Float,
+    straightness: Float,
+    debug: String
+  ) {
+    let deviceTransform = Transform(matrix: device.originFromAnchorTransform)
+    let devicePosition = deviceTransform.translation
 
     // Detect the palm plane, and try to orient the normal to face "outwards".
     var (centroid, normal) = palmPlane(hand)
@@ -99,21 +112,38 @@ class GestureDetector {
     if dot(palmOrientation, normal) < 0 {
       normal = -normal
     }
+    // TODO: maybe bias the normal towards where the device is facing
 
-    return (centroid, normal, 20.0 * .pi / 180, true, "")
+    // Detect palm angle
+    let fingerTips: [HandSkeleton.JointName] = [.thumbTip, .indexFingerTip, .middleFingerTip,
+                                                .ringFingerTip, .littleFingerTip];
+    let fingerVectors = fingerTips.map { normalize(hand.jointPosition($0) - devicePosition) }
+    var maxAngle: Float = 0
+    for i in 0..<fingerTips.count {
+      for j in i+1..<fingerTips.count {
+        maxAngle = max(maxAngle, acos(dot(fingerVectors[i], fingerVectors[j])))
+      }
+    }
+
+    // Detect finger openness/curl
+    var avgStraightness: Float = 0
+    for finger in fingers {
+      let connections = finger.map { normalize(hand.jointPosition($0.1) - hand.jointPosition($0.0)) }
+      var straightness: Float = 1;
+      for i in 0..<connections.count - 1 {
+        straightness *= dot(connections[i], connections[i+1])
+      }
+      avgStraightness += straightness
+    }
+    avgStraightness /= 5
+
+    return (centroid, normal, maxAngle, avgStraightness, "")
   }
 
   private func palmPlane(_ hand: HandAnchor) -> (centroid: SIMD3<Float>, normal: SIMD3<Float>) {
-    guard let skeleton = hand.handSkeleton else {
-      return ([0, 0, 0], [0, 0, 0])
-    }
     var points: [SIMD3<Float>] = []
-    for joint in skeleton.allJoints {
-      // Ignore the forearm joints which are far away from the palm
-      if joint.name == .forearmArm || joint.name == .forearmWrist {
-        continue
-      }
-      points.append(hand.jointPosition(joint.name))
+    for joint in palmJoints {
+      points.append(hand.jointPosition(joint))
     }
     let centroid = points.reduce([0, 0, 0]) { $0 + $1 } / Float(points.count)
     let centeredPoints = points.map { $0 - centroid }
@@ -128,7 +158,7 @@ class GestureDetector {
     covMatrix.columns.1 /= Float(points.count)
     covMatrix.columns.2 /= Float(points.count)
 
-    let (values, vectors) = eigen(covMatrix)
+    let (_, vectors) = eigen(covMatrix)
     return (centroid, vectors[0])
   }
 
@@ -256,12 +286,13 @@ struct ImmersiveView: View {
   func updateSelectedUnits(device: DeviceAnchor, hand: HandAnchor) {
     if hand.chirality == .left { return } // TODO: Ignore left hand for now
 
-    var devicePosition = device.originFromAnchorTransform.columns.3.xyz
+    let deviceTransform = Transform(matrix: device.originFromAnchorTransform)
+    var devicePosition = deviceTransform.translation
     devicePosition.y -= 0.1 // TODO: why is the device position so high?
 
-    let (palmCenter, palmDirection, palmAngle, selecting, desc) = gestureDetector.detectSelecting(hand)
+    let (palmCenter, palmDirection, palmAngle, straightness, desc) = gestureDetector.isSelecting(device, hand)
     var hits = 0
-    if selecting {
+    if straightness > 0.6 {
       for unit in units {
         let unitDirection = normalize(unit.position - palmCenter)
         let angle = acos(dot(palmDirection, unitDirection))
@@ -288,18 +319,21 @@ struct ImmersiveView: View {
 
     // Debug info
     appModel.log1 = String(format: """
-Device position: %@
-Palm center: %@
-Palm direction: %@
-Palm angle: %.2f
-Hits: %d
-""", devicePosition.shortDesc, palmCenter.shortDesc, palmDirection.shortDesc, palmAngle * 180.0 / .pi, hits)
+                           Device position: %@
+                           Palm center: %@
+                           Palm direction: %@
+                           Palm angle: %.2f
+                           Hits: %d
+                           """,
+                           devicePosition.shortDesc,
+                           palmCenter.shortDesc, palmDirection.shortDesc,
+                           palmAngle * 180.0 / .pi, hits)
     if let skeleton = hand.handSkeleton {
       var pos: [String] = []
       for joint in skeleton.allJoints {
         pos.append(hand.jointPosition(joint.name).shortDesc)
       }
-      appModel.log2 = desc + "\n\n" + pos.joined(separator: ",\n")
+      appModel.log2 = desc + "\n" + pos.joined(separator: ",\n")
     }
   }
 }
