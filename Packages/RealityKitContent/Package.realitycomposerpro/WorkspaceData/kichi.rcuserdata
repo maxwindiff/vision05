@@ -1,8 +1,7 @@
 {
   "advancedEditorSelectedIdentifier" : "ProjectBrowser",
   "openSceneRelativePaths" : [
-    "Immersive.usda",
-    "Debug.usda"
+    "Immersive.usda"
   ],
   "recentIdentifiers" : {
     "AF09ED6F-1707-48FD-8720-65B998362C09" : [
@@ -370,5 +369,5 @@
   "sceneViewportBackgroundColors" : {
 
   },
-  "selectedSceneRelativePath" : "Debug.usda"
+  "selectedSceneRelativePath" : "Immersive.usda"
 }
