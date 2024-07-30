@@ -112,9 +112,11 @@ class GestureDetector {
     if dot(palmOrientation, normal) < 0 {
       normal = -normal
     }
-    // TODO: maybe bias the normal towards where the device is facing
 
-    // Detect palm angle
+    // Bias the normal towards where the user is facing
+    normal = 0.6 * normal + 0.4 * deviceTransform.rotation.act([0, 0, -1])
+
+    // Detect finger angle
     let fingerTips: [HandSkeleton.JointName] = [.thumbTip, .indexFingerTip, .middleFingerTip,
                                                 .ringFingerTip, .littleFingerTip];
     let fingerVectors = fingerTips.map { normalize(hand.jointPosition($0) - devicePosition) }
@@ -320,12 +322,14 @@ struct ImmersiveView: View {
     // Debug info
     appModel.log1 = String(format: """
                            Device position: %@
+                           Device direction: %@
                            Palm center: %@
                            Palm direction: %@
                            Palm angle: %.2f
                            Hits: %d
                            """,
                            devicePosition.shortDesc,
+                           deviceTransform.rotation.act([0, 0, -1]).shortDesc,
                            palmCenter.shortDesc, palmDirection.shortDesc,
                            palmAngle * 180.0 / .pi, hits)
     if let skeleton = hand.handSkeleton {

@@ -9,7 +9,7 @@ struct ContentView: View {
     VStack {
       ToggleImmersiveSpaceButton()
       TextEditor(text: .constant(appModel.log1))
-        .frame(maxHeight: 120)
+        .frame(maxHeight: 150)
       HStack {
         Button(action: {
           UIPasteboard.general.string = appModel.log1
