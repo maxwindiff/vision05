@@ -1,3 +1,4 @@
+import Accelerate
 import ARKit
 import SwiftUI
 import RealityKit
@@ -25,8 +26,7 @@ class UnitEntity: RealityKit.Entity {
 
   func displayPosition() {
     // TODO: use TextComponent?
-    placard.model?.materials = [renderToMaterial(text: String(format: "(%.2f, %.2f, %.2f)",
-                                                              position.x, position.y, position.z))]
+    placard.model?.materials = [renderToMaterial(text: position.shortDesc)]
   }
 
   func renderToMaterial(text: String) -> SimpleMaterial {
@@ -52,6 +52,127 @@ class UnitEntity: RealityKit.Entity {
   }
 }
 
+class GestureDetector {
+  private let fingers: [[(HandSkeleton.JointName, HandSkeleton.JointName)]] = [
+    [
+      (.wrist, .thumbKnuckle),
+      (.thumbKnuckle, .thumbIntermediateBase),
+      (.thumbIntermediateBase, .thumbIntermediateTip),
+      (.thumbIntermediateTip, .thumbTip),
+    ], [
+      (.wrist, .indexFingerMetacarpal),
+      (.indexFingerMetacarpal, .indexFingerKnuckle),
+      (.indexFingerKnuckle, .indexFingerIntermediateBase),
+      (.indexFingerIntermediateBase, .indexFingerIntermediateTip),
+      (.indexFingerIntermediateTip, .indexFingerTip),
+    ], [
+      (.wrist, .middleFingerMetacarpal),
+      (.middleFingerMetacarpal, .middleFingerKnuckle),
+      (.middleFingerKnuckle, .middleFingerIntermediateBase),
+      (.middleFingerIntermediateBase, .middleFingerIntermediateTip),
+      (.middleFingerIntermediateTip, .middleFingerTip),
+    ], [
+      (.wrist, .ringFingerMetacarpal),
+      (.ringFingerMetacarpal, .ringFingerKnuckle),
+      (.ringFingerKnuckle, .ringFingerIntermediateBase),
+      (.ringFingerIntermediateBase, .ringFingerIntermediateTip),
+      (.ringFingerIntermediateTip, .ringFingerTip),
+    ], [
+      (.wrist, .littleFingerMetacarpal),
+      (.littleFingerMetacarpal, .littleFingerKnuckle),
+      (.littleFingerKnuckle, .littleFingerIntermediateBase),
+      (.littleFingerIntermediateBase, .littleFingerIntermediateTip),
+      (.littleFingerIntermediateTip, .littleFingerTip),
+    ]
+  ]
+
+  func detectSelecting(_ hand: HandAnchor) -> (SIMD3<Float>, SIMD3<Float>, Float, Bool, String) {
+    guard let skeleton = hand.handSkeleton else {
+      return ([0, 0, 0], [0, 0, 0], 0, false, "No skeleton")
+    }
+
+    // Detect the palm plane, and try to orient the normal to face "outwards".
+    var (centroid, normal) = palmPlane(hand)
+    let upperDiag = hand.jointPosition(.littleFingerKnuckle) - hand.jointPosition(.indexFingerMetacarpal)
+    let lowerDiag = hand.jointPosition(.littleFingerMetacarpal) - hand.jointPosition(.indexFingerKnuckle)
+    let palmOrientation = normalize(cross(upperDiag, lowerDiag))
+    if dot(palmOrientation, normal) < 0 {
+      normal = -normal
+    }
+
+    return (centroid, normal, 20.0 * .pi / 180, true, "")
+  }
+
+  private func palmPlane(_ hand: HandAnchor) -> (centroid: SIMD3<Float>, normal: SIMD3<Float>) {
+    guard let skeleton = hand.handSkeleton else {
+      return ([0, 0, 0], [0, 0, 0])
+    }
+    var points: [SIMD3<Float>] = []
+    for joint in skeleton.allJoints {
+      // Ignore the forearm joints which are far away from the palm
+      if joint.name == .forearmArm || joint.name == .forearmWrist {
+        continue
+      }
+      points.append(hand.jointPosition(joint.name))
+    }
+    let centroid = points.reduce([0, 0, 0]) { $0 + $1 } / Float(points.count)
+    let centeredPoints = points.map { $0 - centroid }
+
+    var covMatrix = simd_float3x3(0.0)
+    for point in centeredPoints {
+      covMatrix.columns.0 += point * point.x
+      covMatrix.columns.1 += point * point.y
+      covMatrix.columns.2 += point * point.z
+    }
+    covMatrix.columns.0 /= Float(points.count)
+    covMatrix.columns.1 /= Float(points.count)
+    covMatrix.columns.2 /= Float(points.count)
+
+    let (values, vectors) = eigen(covMatrix)
+    return (centroid, vectors[0])
+  }
+
+  func eigen(_ matrix: simd_float3x3) -> (eigenvalues: SIMD3<Float>, eigenvectors: simd_float3x3) {
+    var JOBZ = Int8("V".utf8.first!)
+    var UPLO = Int8("U".utf8.first!)
+
+    var n = __LAPACK_int(3)
+    let a = UnsafeMutablePointer<Float>.allocate(capacity: 3*3)
+    for i in 0..<3 {
+      for j in 0..<3 {
+        a[i*3+j] = matrix[i][j]
+      }
+    }
+    var lda = __LAPACK_int(3)
+    let w = UnsafeMutablePointer<Float>.allocate(capacity: 3)
+    defer {
+      a.deallocate()
+      w.deallocate()
+    }
+
+    var workspaceDimension = Float()
+    var workspaceQuery = __LAPACK_int(-1)
+    var info = __LAPACK_int(0)
+    ssyev_(&JOBZ, &UPLO, &n, a, &lda, w, &workspaceDimension, &workspaceQuery, &info);
+    var lwork = __LAPACK_int(workspaceDimension)
+
+    let work = UnsafeMutablePointer<Float>.allocate(capacity: Int(lwork))
+    defer {
+      work.deallocate()
+    }
+    ssyev_(&JOBZ, &UPLO, &n, a, &lda, w, work, &lwork, &info);
+
+    return (
+      simd_float3(w[0], w[1], w[2]),
+      simd_float3x3(
+        simd_float3(a[0], a[1], a[2]),
+        simd_float3(a[3], a[4], a[5]),
+        simd_float3(a[6], a[7], a[8])
+      )
+    )
+  }
+}
+
 struct ImmersiveView: View {
   @Environment(AppModel.self) private var appModel
 
@@ -59,6 +180,8 @@ struct ImmersiveView: View {
   let worldTracking = WorldTrackingProvider()
   let handTracking = HandTrackingProvider()
   let headAnchor = AnchorEntity(.head)
+
+  let gestureDetector = GestureDetector()
 
   @State var leftHand: HandSkeletonView?
   @State var rightHand: HandSkeletonView?
@@ -134,44 +257,50 @@ struct ImmersiveView: View {
     if hand.chirality == .left { return } // TODO: Ignore left hand for now
 
     var devicePosition = device.originFromAnchorTransform.columns.3.xyz
-    devicePosition.y -= 0.15 // TODO: why is the device position so high?
-    let handPosition = hand.originFromAnchorTransform.columns.3.xyz
-    let handDirection = normalize(handPosition - devicePosition)
+    devicePosition.y -= 0.1 // TODO: why is the device position so high?
 
-    let selectionAngle: Float = 20.0 * .pi / 180  // TODO: use size of hand
+    let (palmCenter, palmDirection, palmAngle, selecting, desc) = gestureDetector.detectSelecting(hand)
     var hits = 0
-    var log2: [String] = []
-    for unit in units {
-      let unitDirection = normalize(unit.position - devicePosition)
+    if selecting {
+      for unit in units {
+        let unitDirection = normalize(unit.position - palmCenter)
+        let angle = acos(dot(palmDirection, unitDirection))
+        let hit = angle < palmAngle
+        if hit {
+          hits += 1
+          unit.highlight()
+        } else {
+          unit.unhighlight()
+        }
+      }
 
-      let angle = acos(dot(handDirection, unitDirection))
-      let hit = angle < selectionAngle
-      if hit {
-        hits += 1
-        unit.highlight()
-        log2.append(String(format: "(% .2f, % .2f, % .2f)",
-                           unitDirection.x, unitDirection.y, unitDirection.z))
-      } else {
+      let coneHeight: Float = 2.0
+      let coneRadius = tan(palmAngle) * coneHeight
+      debugCone?.look(at: palmCenter + palmDirection, from: palmCenter, relativeTo: nil)
+      debugCone?.scale = [coneRadius, coneRadius, coneHeight]
+    } else {
+      for unit in units {
         unit.unhighlight()
       }
+
+      debugCone?.scale = [0, 0, 0]
     }
 
-    let coneHeight: Float = 2.0
-    let coneRadius = tan(selectionAngle) * coneHeight
-    debugCone?.look(at: devicePosition + handDirection, from: handPosition, relativeTo: nil)
-    debugCone?.scale = [coneRadius, coneRadius, coneHeight]
-
+    // Debug info
     appModel.log1 = String(format: """
-Device position: (% .2f, % .2f, % .2f)
-Hand position: (% .2f, % .2f, % .2f)
-Hand direction: (% .2f, % .2f, % .2f) 
+Device position: %@
+Palm center: %@
+Palm direction: %@
+Palm angle: %.2f
 Hits: %d
-""",
-                           devicePosition.x, devicePosition.y, devicePosition.z,
-                           handPosition.x, handPosition.y, handPosition.z,
-                           handDirection.x, handDirection.y, handDirection.z,
-                           hits)
-    appModel.log2 = log2.joined(separator: "\n")
+""", devicePosition.shortDesc, palmCenter.shortDesc, palmDirection.shortDesc, palmAngle * 180.0 / .pi, hits)
+    if let skeleton = hand.handSkeleton {
+      var pos: [String] = []
+      for joint in skeleton.allJoints {
+        pos.append(hand.jointPosition(joint.name).shortDesc)
+      }
+      appModel.log2 = desc + "\n\n" + pos.joined(separator: ",\n")
+    }
   }
 }
 
@@ -181,6 +310,33 @@ extension SIMD4 {
   }
 }
 
+extension SIMD3<Float> {
+  var shortDesc: String {
+    return String(format: "(% .2f, % .2f, % .2f)", self[0], self[1], self[2])
+  }
+}
+
+extension simd_float4x4 {
+  var translation: SIMD3<Float> {
+    return columns.3.xyz
+  }
+}
+
+extension simd_float3x3 {
+  var trace: Float {
+    return self[0][0] + self[1][1] + self[2][2]
+  }
+}
+
+extension HandAnchor {
+  func jointPosition(_ joint: HandSkeleton.JointName) -> SIMD3<Float> {
+    if let handSkeleton {
+      return (originFromAnchorTransform * handSkeleton.joint(joint).anchorFromJointTransform).translation
+    } else {
+      return [0, 0, 0]
+    }
+  }
+}
 #Preview(immersionStyle: .mixed) {
   ImmersiveView()
     .environment(AppModel())

@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		0048C5172C4E3F300048D418 /* RealityKitContent in Frameworks */ = {isa = PBXBuildFile; productRef = 0048C5162C4E3F300048D418 /* RealityKitContent */; };
+		00762C432C585C2D004D97EC /* Accelerate.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 00762C422C585C2D004D97EC /* Accelerate.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -24,6 +25,7 @@
 		0048C5112C4E3F300048D418 /* vision05.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = vision05.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		0048C5152C4E3F300048D418 /* RealityKitContent */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = RealityKitContent; sourceTree = "<group>"; };
 		0048C52C2C4E3F310048D418 /* vision05Tests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = vision05Tests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		00762C422C585C2D004D97EC /* Accelerate.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Accelerate.framework; path = System/Library/Frameworks/Accelerate.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -46,6 +48,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				00762C432C585C2D004D97EC /* Accelerate.framework in Frameworks */,
 				0048C5172C4E3F300048D418 /* RealityKitContent in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -67,6 +70,7 @@
 				0048C5142C4E3F300048D418 /* Packages */,
 				0048C52F2C4E3F310048D418 /* vision05Tests */,
 				0048C5122C4E3F300048D418 /* Products */,
+				00762C412C585C2D004D97EC /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -85,6 +89,14 @@
 				0048C5152C4E3F300048D418 /* RealityKitContent */,
 			);
 			path = Packages;
+			sourceTree = "<group>";
+		};
+		00762C412C585C2D004D97EC /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				00762C422C585C2D004D97EC /* Accelerate.framework */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -227,6 +239,10 @@
 				DEVELOPMENT_ASSET_PATHS = "\"vision05/Preview Content\"";
 				DEVELOPMENT_TEAM = MFL6L88RLH;
 				ENABLE_PREVIEWS = YES;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"ACCELERATE_NEW_LAPACK=1",
+				);
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "$(TARGET_NAME)/Info.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -253,6 +269,7 @@
 				DEVELOPMENT_ASSET_PATHS = "\"vision05/Preview Content\"";
 				DEVELOPMENT_TEAM = MFL6L88RLH;
 				ENABLE_PREVIEWS = YES;
+				GCC_PREPROCESSOR_DEFINITIONS = "ACCELERATE_NEW_LAPACK=1";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "$(TARGET_NAME)/Info.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
