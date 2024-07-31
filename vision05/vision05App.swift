@@ -22,7 +22,8 @@ struct vision05App: App {
         .onDisappear {
           appModel.immersiveSpaceState = .closed
         }
+        .persistentSystemOverlays(.hidden)
     }
-    .immersionStyle(selection: .constant(.mixed), in: .mixed)
+    .immersionStyle(selection: .constant(.progressive), in: .progressive)
   }
 }
