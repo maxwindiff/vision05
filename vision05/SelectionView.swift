@@ -28,6 +28,8 @@ struct SelectionView: View {
       let size = min(geometry.size.width, geometry.size.height)
       ZStack {
         ForEach(0..<4) { index in
+          let level = min(max(level, 0), 1)
+
           let t1level = min(1, level / threshold1)
           let t2level = max(0, level - threshold2) / (1 - threshold2)
 
@@ -43,7 +45,7 @@ struct SelectionView: View {
             .opacity(opacity)
             .frame(width: size, height: size)
         }
-      }
+      }.padding(10)
     }
   }
 }
