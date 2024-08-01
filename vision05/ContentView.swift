@@ -8,8 +8,8 @@ struct ContentView: View {
   var body: some View {
     VStack {
       ToggleImmersiveSpaceButton()
-      TextEditor(text: .constant(appModel.log1))
-        .frame(maxHeight: 150)
+      Text(appModel.log1)
+        .frame(maxWidth: .infinity, maxHeight: 150)
       HStack {
         Button(action: {
           UIPasteboard.general.string = appModel.log1
@@ -22,8 +22,8 @@ struct ContentView: View {
           Text("Copy Below")
         }
       }
-      TextEditor(text: .constant(appModel.log2))
-        .frame(maxHeight: .infinity)
+      Text(appModel.log2)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
   }
 }
