@@ -33,3 +33,9 @@ extension HandAnchor {
     }
   }
 }
+
+extension FloatingPoint {
+  func scaleAndClamp(_ lower: Self, _ upper: Self) -> Self {
+    return min(max((self - lower) / (upper - lower), 0), 1)
+  }
+}

@@ -4,7 +4,7 @@ import SwiftUI
 import RealityKit
 import RealityKitContent
 
-let DEBUG = 1
+let DEBUG = 0
 
 class UnitEntity: RealityKit.Entity {
   var model: ModelEntity!
@@ -50,12 +50,114 @@ class UnitEntity: RealityKit.Entity {
     return material
   }
 
-  func highlight() {
+  func highlightSelected() {
+    model.model?.materials = [SimpleMaterial(color: .red, isMetallic: false)]
+  }
+
+  func highlightSelecting() {
     model.model?.materials = [SimpleMaterial(color: .yellow, isMetallic: false)]
   }
 
   func unhighlight() {
     model.model?.materials = [SimpleMaterial(color: .white, isMetallic: false)]
+  }
+}
+
+class SelectionTracker {
+  enum State: CustomStringConvertible {
+    case notSelecting
+    case selecting
+    case selected
+
+    var description: String {
+      switch self {
+      case .notSelecting: "Not Selecting"
+      case .selecting: "Selecting"
+      case .selected: "Selected"
+      }
+    }
+  }
+
+  let windowSize = 20
+  let dropWindowSize = 5
+  let graspThreshold: Float = 0.3
+  let ungraspThreshold: Float = 0.5
+  let selectingThreshold: Float = 0.6
+
+  private struct Record {
+    let timestamp: Double
+    let center: SIMD3<Float>
+    let angle: Float
+    let direction: SIMD3<Float>
+    let straightness: Float
+  }
+  private var records: [Record] = []
+  private var state: State = .notSelecting
+  private var selection: Record?
+
+  func update(timestamp: Double, center: SIMD3<Float>, angle: Float, direction: SIMD3<Float>, straightness: Float) -> (State, SIMD3<Float>, Float, SIMD3<Float>) {
+    addRecord(
+      Record(
+        timestamp: timestamp,
+        center: center,
+        angle: angle,
+        direction: direction,
+        straightness: straightness
+      )
+    )
+
+    switch state {
+    case .notSelecting:
+      if straightness > selectingThreshold {
+        state = .selecting
+        selection = nil
+      }
+
+    case .selecting:
+      if let preDrop = findAbruptDrop() {
+        state = .selected
+        selection = preDrop
+        records.removeAll()
+      }
+
+    case .selected:
+      if straightness > ungraspThreshold {
+        state = .selecting
+        selection = nil
+      }
+    }
+
+    switch state {
+    case .notSelecting:
+      return (state, [0, 0, 0], 0, [0, 0, 0])
+
+    case .selecting:
+      let averageCenter = records.reduce([0, 0, 0]) { $0 + $1.center } / Float(records.count)
+      let averageAngle = records.reduce(0) { $0 + $1.angle } / Float(records.count)
+      let averageDirection = records.reduce([0, 0, 0]) { $0 + $1.direction } / Float(records.count)
+      return (state, averageCenter, averageAngle, averageDirection)
+
+    case .selected:
+      return (state, selection!.center, selection!.angle, selection!.direction)
+    }
+  }
+
+  private func addRecord(_ value: Record) {
+    // TODO: use ring buffer?
+    records.append(value)
+    if records.count > windowSize {
+      records.removeFirst()
+    }
+  }
+
+  private func findAbruptDrop() -> Record? {
+    guard records.count >= dropWindowSize else { return nil }
+    for i in stride(from: records.count-1, through: dropWindowSize, by: -1) {
+      if records[i - dropWindowSize].straightness - records[i].straightness > graspThreshold {
+        return records[i-2]
+      }
+    }
+    return nil
   }
 }
 
@@ -67,20 +169,24 @@ struct ImmersiveView: View {
   let handTracking = HandTrackingProvider()
   let headAnchor = AnchorEntity(.head)
 
-  let gestureDetector = GestureDetector()
-
   @State var units: [UnitEntity] = []
   @State var leftHand: HandSkeletonView?
   @State var rightHand: HandSkeletonView?
   @State var debugCone: Entity?
 
+  let gestureDetector = GestureDetector()
   @State var deviceTransform: Transform = .identity
   @State var palmCenter: SIMD3<Float> = [0, 0, 0]
   @State var palmDirection: SIMD3<Float> = [0, 0, 0]
   @State var palmAngle: Float = 0
   @State var straightness: Float = 0
 
-  @State var selectionLevel = 0.5
+  let selectionTracker = SelectionTracker()
+  @State var selectionState: SelectionTracker.State = .notSelecting
+  @State var selectionRingVisibility: Float = 0
+  @State var selectionCenter: SIMD3<Float> = [0, 0, 0]
+  @State var selectionAngle: Float = 0
+  @State var selectionDirection: SIMD3<Float> = [0, 0, 0]
 
   var body: some View {
     RealityView { content, attachments in
@@ -105,31 +211,35 @@ struct ImmersiveView: View {
         }
       }
     } update: { content, attachments in
-      if straightness > 0.6 {
+      if selectionState == .notSelecting {
         for unit in units {
-          let unitDirection = normalize(unit.position - palmCenter)
-          let angle = acos(dot(palmDirection, unitDirection))
-          let hit = angle < palmAngle
-          if hit {
-            unit.highlight()
+          unit.unhighlight()
+        }
+      } else {
+        for unit in units {
+          let unitDirection = normalize(unit.position - selectionCenter)
+          let angle = acos(dot(selectionDirection, unitDirection))
+          if angle < selectionAngle {
+            if selectionState == .selected {
+              unit.highlightSelected()
+            } else if selectionState == .selecting {
+              unit.highlightSelecting()
+            }
           } else {
             unit.unhighlight()
           }
         }
-      } else {
-        for unit in units {
-          unit.unhighlight()
-        }
       }
 
       if let selectionView = attachments.entity(for: "SelectionView") {
-        selectionView.look(at: deviceTransform.translation, from: palmCenter, relativeTo: nil)
-        let scale = 0.3 / selectionView.attachment.bounds.extents.x
+        // TODO: better size and placement
+        selectionView.look(at: selectionCenter + selectionDirection, from: selectionCenter, relativeTo: nil)
+        let scale = selectionAngle * 0.75 / selectionView.attachment.bounds.extents.x
         selectionView.scale = [scale, scale, scale]
       }
     } attachments: {
       Attachment(id: "SelectionView") {
-        SelectionView(level: selectionLevel)
+        SelectionView(level: selectionRingVisibility, selected: selectionState == .selected)
       }
     }
     .task {
@@ -174,12 +284,42 @@ struct ImmersiveView: View {
 
     // TODO: Support both hands for selection
     if hand.chirality == .right {
+      // TODO: instead of using palm center, should use some other kind of center of the hand
       (palmCenter, palmDirection, palmAngle, straightness) = gestureDetector.isSelecting(device, hand)
-      if straightness > 0.6 {
-        selectionLevel = Double((1 - straightness) / 0.4)
-      } else {
-        selectionLevel = 0
+      (selectionState, selectionCenter, selectionAngle, selectionDirection) = selectionTracker.update(
+        timestamp: CACurrentMediaTime(),
+        center: palmCenter,
+        angle: palmAngle,
+        direction: palmDirection,
+        straightness: straightness
+      )
+
+      if selectionState == .selected {
+        selectionRingVisibility = 1.0
+      } else if selectionState == .selecting {
+        let orthogonality = dot(normalize(palmCenter - deviceTransform.translation), palmDirection)
+        selectionRingVisibility = orthogonality.scaleAndClamp(0.5, 0.8)
       }
+
+      appModel.log1 = String(format: """
+                             Device position: %@
+                             Device direction: %@
+                             Palm center: %@
+                             Palm direction: %@
+                             Palm angle: %.2f
+                             """,
+                             deviceTransform.translation.shortDesc,
+                             deviceTransform.rotation.act([0, 0, -1]).shortDesc,
+                             palmCenter.shortDesc, palmDirection.shortDesc,
+                             palmAngle * 180.0 / .pi)
+      appModel.log2 = String(format: """
+                             straightness: %.2f
+                             selectionState: %@
+                             selectionCenter: %@
+                             selectionAngle: %.2f
+                             selectionRingVisibility: %.2f
+                             """, straightness, selectionState.description,
+                             selectionCenter.shortDesc, selectionAngle, selectionRingVisibility)
     }
 
     if DEBUG >= 1 {
@@ -192,18 +332,6 @@ struct ImmersiveView: View {
         let coneRadius = tan(palmAngle) * coneHeight
         debugCone?.look(at: palmCenter + palmDirection, from: palmCenter, relativeTo: nil)
         debugCone?.scale = [coneRadius, coneRadius, coneHeight]
-
-        appModel.log1 = String(format: """
-                               Device position: %@
-                               Device direction: %@
-                               Palm center: %@
-                               Palm direction: %@
-                               Palm angle: %.2f
-                               """,
-                               deviceTransform.translation.shortDesc,
-                               deviceTransform.rotation.act([0, 0, -1]).shortDesc,
-                               palmCenter.shortDesc, palmDirection.shortDesc,
-                               palmAngle * 180.0 / .pi)
       }
     }
   }

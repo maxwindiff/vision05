@@ -16,46 +16,56 @@ struct Arc: Shape {
 }
 
 struct SelectionView: View {
-  // 0  - t1: fade in
-  // t1 - t2: arc to circle
-  // t2 - 1: bold, red
-  var level: Double
-  let threshold1 = 0.2
-  let threshold2 = 0.9
+  var level: Float
+  var selected: Bool
+  @State var effectiveSelected: Bool = false
 
   var body: some View {
-    GeometryReader { geometry in
+    GeometryReader { (geometry: GeometryProxy) in
       let size = min(geometry.size.width, geometry.size.height)
       ZStack {
-        ForEach(0..<4) { index in
-          let level = min(max(level, 0), 1)
-
-          let t1level = min(1, level / threshold1)
-          let t2level = max(0, level - threshold2) / (1 - threshold2)
-
-          let arcSize = 35.0 + level * 55.0
-          let opacity = t1level
-          let stroke = 5 + t2level * 5
-          let color = Color.white.mix(with: .red, by: t2level)
+        ForEach(0..<4) { (index:Int) in
+          let selected = effectiveSelected
+          let arcSize: Double = selected ? 90.0 : Double(35.0 + level * 35.0)
+          let opacity: Float = selected ? Float(1) : level
+          let stroke: CGFloat = selected ? 15.0 : 10.0
+          let color: Color = selected ? .red : .white
+          let size: CGFloat = selected ? size * 0.95 : size
 
           let startAngle = Double(index) * 90 + 45 - arcSize / 2
           Arc(startAngle: .degrees(startAngle), arcAngle: .degrees(arcSize))
             .stroke(color, style: StrokeStyle(lineWidth: stroke, lineCap: .round))
             .shadow(color: color, radius: 5)
-            .opacity(opacity)
+            .opacity(Double(opacity))
             .frame(width: size, height: size)
         }
-      }.padding(10)
+      }
+      .position(x: geometry.frame(in: .local).midX,
+                y: geometry.frame(in: .local).midY)
+    }
+    .padding(20)
+    .onChange(of: selected) { old, new in
+      withAnimation {
+        effectiveSelected = new
+      }
     }
   }
 }
 
 #Preview {
-  @Previewable @State var level = 0.5
+  @Previewable @State var level: Float = 0.5
+  @Previewable @State var selected = false
 
   VStack {
-    SelectionView(level: level)
-    Slider(value: $level, in: 0...1)
+    SelectionView(level: level, selected: selected)
+      .border(Color.white, width: 1)
+    HStack {
+      Text("Level")
+      Slider(value: $level, in: 0...1)
+    }
+    Toggle(isOn: $selected) {
+      Text("Selected")
+    }
   }
   .frame(width: 400, height: 600)
 }
