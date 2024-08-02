@@ -66,6 +66,7 @@ class GestureDetector {
     normal = 0.6 * normal + 0.4 * deviceTransform.rotation.act([0, 0, -1])
 
     // Detect finger angle
+    // TODO: this is not quite what we wanted when the hand is not perpendicular to the device
     let fingerTips: [HandSkeleton.JointName] = [.thumbTip, .indexFingerTip, .middleFingerTip,
                                                 .ringFingerTip, .littleFingerTip];
     let fingerVectors = fingerTips.map { normalize(hand.jointPosition($0) - devicePosition) }
