@@ -89,7 +89,7 @@ class SelectionTracker {
     guard records.count >= dropWindowSize else { return nil }
     for i in stride(from: records.count-1, through: dropWindowSize, by: -1) {
       if records[i - dropWindowSize].straightness - records[i].straightness > graspThreshold {
-        return records[i-2]
+        return records[i - dropWindowSize]
       }
     }
     return nil
