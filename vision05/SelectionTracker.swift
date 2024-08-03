@@ -13,7 +13,7 @@ class SelectionTracker {
     }
   }
 
-  let windowSize = 20
+  let windowSize = 10
   let dropWindowSize = 5
   let graspThreshold: Float = 0.3
   let ungraspThreshold: Float = 0.5

@@ -7,16 +7,13 @@ import RealityKitContent
 let DEBUG = 0
 
 class UnitEntity: RealityKit.Entity {
-  var model: ModelEntity!
+  var model: Entity
   var debugView: ModelEntity?
 
-  required init() {
-    super.init()
+  required init(model: Entity) {
+    self.model = model
 
-    model = ModelEntity(
-      mesh: .generateBox(size: 0.02),
-      materials: [SimpleMaterial(color: .white, isMetallic: false)]
-    )
+    super.init()
     addChild(model)
 
     if DEBUG >= 2 {
@@ -28,6 +25,10 @@ class UnitEntity: RealityKit.Entity {
       debugView!.position.y = -0.04
       addChild(debugView!)
     }
+  }
+
+  @MainActor @preconcurrency required init() {
+    fatalError("init() has not been implemented")
   }
 
   func updateInfo() {
@@ -51,15 +52,21 @@ class UnitEntity: RealityKit.Entity {
   }
 
   func highlightSelected() {
-    model.model?.materials = [SimpleMaterial(color: .red, isMetallic: false)]
+    if let highlight = model.findEntity(named: "SelectionHighlight") {
+      highlight.isEnabled = true
+    }
   }
 
   func highlightSelecting() {
-    model.model?.materials = [SimpleMaterial(color: .yellow, isMetallic: false)]
+    if let highlight = model.findEntity(named: "SelectionHighlight") {
+      highlight.isEnabled = true
+    }
   }
 
   func unhighlight() {
-    model.model?.materials = [SimpleMaterial(color: .white, isMetallic: false)]
+    if let highlight = model.findEntity(named: "SelectionHighlight") {
+      highlight.isEnabled = false
+    }
   }
 }
 
@@ -92,9 +99,11 @@ struct ImmersiveView: View {
 
   var body: some View {
     RealityView { content, attachments in
-      units = createUnits()
-      for unit in units {
-        content.add(unit)
+      if let units = try? await createUnits() {
+        for unit in units {
+          content.add(unit)
+        }
+        self.units = units
       }
 
       if let selectionView = attachments.entity(for: "SelectionView") {
@@ -161,7 +170,7 @@ struct ImmersiveView: View {
     }
   }
 
-  func createUnits() -> [UnitEntity] {
+  func createUnits() async throws -> [UnitEntity] {
     let height: Float = 1.3  // TODO: use device anchor
 
     var units: [UnitEntity] = []
@@ -170,10 +179,12 @@ struct ImmersiveView: View {
         let dist = 2.0
         let xAngle = 70.0 * .pi / 180 * x
         let yAngle = 40.0 * .pi / 180 * y
-        let unit = UnitEntity()
-        unit.look(at: [0, height, 0], from: [Float(dist * sin(xAngle) * cos(yAngle)),
-                                             Float(dist * sin(yAngle)) + height,
-                                             Float(-dist * cos(xAngle) * cos(yAngle))], relativeTo: nil)
+        let model = try await Entity(named: "BasicUnit", in: realityKitContentBundle)
+        let unit = UnitEntity(model: model)
+        unit.position = [Float(dist * sin(xAngle) * cos(yAngle)),
+                         Float(dist * sin(yAngle)) + height,
+                         Float(-dist * cos(xAngle) * cos(yAngle))]
+        unit.scale = [0.2, 0.2, 0.2]
         unit.updateInfo()
         units.append(unit)
       }

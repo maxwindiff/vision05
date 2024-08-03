@@ -1,0 +1,223 @@
+#usda 1.0
+(
+    customLayerData = {
+        string creator = "Reality Composer Pro Version 2.0 (448.0.7.508.1)"
+    }
+    defaultPrim = "Root"
+    metersPerUnit = 1
+    upAxis = "Y"
+)
+
+def Xform "Root"
+{
+    reorder nameChildren = ["Cone", "SelectionHighlight"]
+    def Cone "Cone" (
+        active = true
+        prepend apiSchemas = ["MaterialBindingAPI"]
+        customData = {
+            float3 rotationEulerHint = (-1.5707963, 1.7881393e-7, 1.5707963)
+        }
+    )
+    {
+        uniform token axis = "Y"
+        double height = 0.2
+        rel material:binding = </Root/Cone/DefaultMaterial>
+        double radius = 0.1
+        quatf xformOp:orient = (-0.5, 0.50000006, 0.49999994, -0.50000006)
+        float3 xformOp:scale = (1, 1, 1)
+        float3 xformOp:translate = (0, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+
+        def Material "DefaultMaterial"
+        {
+            token outputs:mtlx:surface
+            token outputs:realitykit:vertex
+            prepend token outputs:surface.connect = </Root/Cone/DefaultMaterial/DefaultSurfaceShader.outputs:surface>
+            float2 ui:nodegraph:realitykit:subgraphOutputs:pos = (0, 110.5)
+
+            def Shader "DefaultSurfaceShader"
+            {
+                uniform token info:id = "UsdPreviewSurface"
+                color3f inputs:diffuseColor = (1, 1, 1)
+                float inputs:roughness = 0.75
+                token outputs:surface
+            }
+        }
+    }
+
+    def Cube "SelectionHighlight" (
+        active = true
+        prepend apiSchemas = ["MaterialBindingAPI"]
+        customData = {
+            float3 rotationEulerHint = (0, 0, 0)
+        }
+    )
+    {
+        rel material:binding = </Root/SelectionHighlight/DefaultMaterial>
+        double size = 0.2
+        quatf xformOp:orient = (1, 0, 0, 0)
+        float3 xformOp:scale = (2, 2, 2)
+        float3 xformOp:translate = (0, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+
+        def Material "DefaultMaterial"
+        {
+            token outputs:mtlx:surface.connect = </Root/SelectionHighlight/DefaultMaterial/PreviewSurface.outputs:out>
+            token outputs:realitykit:vertex
+            token outputs:surface.connect = </Root/SelectionHighlight/DefaultMaterial/DefaultSurfaceShader.outputs:surface>
+            float2 ui:nodegraph:realitykit:subgraphOutputs:pos = (302.86328, 212.08594)
+            int ui:nodegraph:realitykit:subgraphOutputs:stackingOrder = 163
+
+            def Shader "DefaultSurfaceShader" (
+                active = false
+            )
+            {
+                uniform token info:id = "UsdPreviewSurface"
+                color3f inputs:diffuseColor = (1, 1, 1)
+                float inputs:roughness = 0.75
+                token outputs:surface
+            }
+
+            def Shader "PreviewSurface"
+            {
+                uniform token info:id = "ND_UsdPreviewSurface_surfaceshader"
+                float inputs:clearcoat = 0
+                float inputs:clearcoatRoughness = 0
+                color3f inputs:diffuseColor = (1, 0.80374205, 0) (
+                    colorSpace = "srgb_texture"
+                )
+                color3f inputs:diffuseColor.connect = None
+                float inputs:ior = 1
+                float inputs:metallic = 0
+                float inputs:metallic.connect = None
+                float3 inputs:normal
+                float inputs:occlusion = 1
+                float inputs:opacity.connect = </Root/SelectionHighlight/DefaultMaterial/Max_2.outputs:out>
+                float inputs:opacityThreshold
+                float inputs:roughness = 1
+                float inputs:roughness.connect = None
+                token outputs:out
+                float2 ui:nodegraph:node:pos = (16.117188, 110.16016)
+                int ui:nodegraph:node:stackingOrder = 196
+                string[] ui:nodegraph:realitykit:node:attributesShowingChildren = ["Advanced", "inputs:diffuseColor", "outputs:out"]
+            }
+
+            def Shader "TextureCoordinates"
+            {
+                uniform token info:id = "ND_texcoord_vector2"
+                float2 outputs:out
+                float2 ui:nodegraph:node:pos = (-986.4336, 119.71875)
+                int ui:nodegraph:node:stackingOrder = 180
+            }
+
+            def Shader "Separate2"
+            {
+                uniform token info:id = "ND_separate2_vector2"
+                float2 inputs:in.connect = </Root/SelectionHighlight/DefaultMaterial/TextureCoordinates.outputs:out>
+                float outputs:outx
+                float outputs:outy
+                float2 ui:nodegraph:node:pos = (-728.1758, 102.13281)
+                int ui:nodegraph:node:stackingOrder = 175
+            }
+
+            def Shader "ConstantFloat"
+            {
+                uniform token info:id = "ND_constant_float"
+                float inputs:value = 0.01
+                float outputs:out
+                float2 ui:nodegraph:node:pos = (-825.3711, -59.160156)
+                int ui:nodegraph:node:stackingOrder = 197
+            }
+
+            def Shader "Oneminus"
+            {
+                uniform token info:id = "ND_realitykit_oneminus_vector2"
+                float2 inputs:in.connect = </Root/SelectionHighlight/DefaultMaterial/TextureCoordinates.outputs:out>
+                float2 outputs:out
+                float2 ui:nodegraph:node:pos = (-804.0508, 179.21875)
+                int ui:nodegraph:node:stackingOrder = 178
+            }
+
+            def Shader "Separate2_1"
+            {
+                uniform token info:id = "ND_separate2_vector2"
+                float2 inputs:in.connect = </Root/SelectionHighlight/DefaultMaterial/Oneminus.outputs:out>
+                float outputs:outx
+                float outputs:outy
+                float2 ui:nodegraph:node:pos = (-668.52734, 211.02344)
+                int ui:nodegraph:node:stackingOrder = 173
+            }
+
+            def Shader "Divide"
+            {
+                uniform token info:id = "ND_divide_float"
+                float inputs:in1.connect = </Root/SelectionHighlight/DefaultMaterial/ConstantFloat.outputs:out>
+                float inputs:in2.connect = </Root/SelectionHighlight/DefaultMaterial/Separate2.outputs:outx>
+                float outputs:out
+                float2 ui:nodegraph:node:pos = (-511.90234, -26.800781)
+                int ui:nodegraph:node:stackingOrder = 67
+            }
+
+            def Shader "Divide_1"
+            {
+                uniform token info:id = "ND_divide_float"
+                float inputs:in1.connect = </Root/SelectionHighlight/DefaultMaterial/ConstantFloat.outputs:out>
+                float inputs:in2.connect = </Root/SelectionHighlight/DefaultMaterial/Separate2.outputs:outy>
+                float outputs:out
+                float2 ui:nodegraph:node:pos = (-475.09375, 30.199219)
+                int ui:nodegraph:node:stackingOrder = 69
+            }
+
+            def Shader "Divide_2"
+            {
+                uniform token info:id = "ND_divide_float"
+                float inputs:in1.connect = </Root/SelectionHighlight/DefaultMaterial/ConstantFloat.outputs:out>
+                float inputs:in2.connect = </Root/SelectionHighlight/DefaultMaterial/Separate2_1.outputs:outx>
+                float outputs:out
+                float2 ui:nodegraph:node:pos = (-477.7422, 126.76172)
+                int ui:nodegraph:node:stackingOrder = 73
+            }
+
+            def Shader "Divide_3"
+            {
+                uniform token info:id = "ND_divide_float"
+                float inputs:in1.connect = </Root/SelectionHighlight/DefaultMaterial/ConstantFloat.outputs:out>
+                float inputs:in2.connect = </Root/SelectionHighlight/DefaultMaterial/Separate2_1.outputs:outy>
+                float outputs:out
+                float2 ui:nodegraph:node:pos = (-474.85156, 204.34375)
+                int ui:nodegraph:node:stackingOrder = 76
+            }
+
+            def Shader "Max"
+            {
+                uniform token info:id = "ND_max_float"
+                float inputs:in1.connect = </Root/SelectionHighlight/DefaultMaterial/Divide.outputs:out>
+                float inputs:in2.connect = </Root/SelectionHighlight/DefaultMaterial/Divide_1.outputs:out>
+                float outputs:out
+                float2 ui:nodegraph:node:pos = (-342.20703, 20.058594)
+                int ui:nodegraph:node:stackingOrder = 81
+            }
+
+            def Shader "Max_1"
+            {
+                uniform token info:id = "ND_max_float"
+                float inputs:in1.connect = </Root/SelectionHighlight/DefaultMaterial/Divide_2.outputs:out>
+                float inputs:in2.connect = </Root/SelectionHighlight/DefaultMaterial/Divide_3.outputs:out>
+                float outputs:out
+                float2 ui:nodegraph:node:pos = (-357.07422, 145.25781)
+                int ui:nodegraph:node:stackingOrder = 86
+            }
+
+            def Shader "Max_2"
+            {
+                uniform token info:id = "ND_max_float"
+                float inputs:in1.connect = </Root/SelectionHighlight/DefaultMaterial/Max.outputs:out>
+                float inputs:in2.connect = </Root/SelectionHighlight/DefaultMaterial/Max_1.outputs:out>
+                float outputs:out
+                float2 ui:nodegraph:node:pos = (-180.0586, 79.38281)
+                int ui:nodegraph:node:stackingOrder = 166
+            }
+        }
+    }
+}
+
