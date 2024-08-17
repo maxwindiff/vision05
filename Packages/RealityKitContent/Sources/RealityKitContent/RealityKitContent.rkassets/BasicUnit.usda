@@ -46,7 +46,6 @@ def Xform "Root"
     }
 
     def Cube "SelectionHighlight" (
-        active = false
         prepend apiSchemas = ["MaterialBindingAPI"]
         customData = {
             float3 rotationEulerHint = (0, 0, 0)
@@ -62,6 +61,14 @@ def Xform "Root"
 
         def Material "DefaultMaterial"
         {
+            color3f inputs:Color = (0, 0, 0) (
+                customData = {
+                    dictionary realitykit = {
+                        float2 positionInSubgraph = (-688.59375, -214.98463)
+                        int stackingOrderInSubgraph = 202
+                    }
+                }
+            )
             token outputs:mtlx:surface.connect = </Root/SelectionHighlight/DefaultMaterial/PreviewSurface.outputs:out>
             token outputs:realitykit:vertex
             token outputs:surface.connect = </Root/SelectionHighlight/DefaultMaterial/DefaultSurfaceShader.outputs:surface>
@@ -86,7 +93,7 @@ def Xform "Root"
                 color3f inputs:diffuseColor = (1, 0.80374205, 0) (
                     colorSpace = "srgb_texture"
                 )
-                color3f inputs:diffuseColor.connect = None
+                color3f inputs:diffuseColor.connect = </Root/SelectionHighlight/DefaultMaterial.inputs:Color>
                 float inputs:ior = 1
                 float inputs:metallic = 0
                 float inputs:metallic.connect = None
@@ -126,7 +133,7 @@ def Xform "Root"
                 float inputs:value = 0.005
                 float outputs:out
                 float2 ui:nodegraph:node:pos = (-825.3711, -59.160156)
-                int ui:nodegraph:node:stackingOrder = 197
+                int ui:nodegraph:node:stackingOrder = 199
             }
 
             def Shader "Oneminus"

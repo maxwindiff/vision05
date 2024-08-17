@@ -44,7 +44,7 @@ class GestureDetector {
     ]
   ]
 
-  func isSelecting(_ device: DeviceAnchor, _ hand: HandAnchor) -> (
+  func detect(_ device: DeviceAnchor, _ hand: HandAnchor) -> (
     centroid: SIMD3<Float>,
     normal: SIMD3<Float>,
     angle: Float,
@@ -52,20 +52,27 @@ class GestureDetector {
   ) {
     let deviceTransform = Transform(matrix: device.originFromAnchorTransform)
     let devicePosition = deviceTransform.translation
+    let handTransform = Transform(matrix: hand.originFromAnchorTransform)
+    let handPosition = handTransform.translation
 
     // Detect the palm plane, and try to orient the normal to face "outwards".
-    var (centroid, normal) = palmPlane(hand)
+    var (palmCenter, palmNormal) = palmPlane(hand)
     let upperDiag = hand.jointPosition(.littleFingerKnuckle) - hand.jointPosition(.indexFingerMetacarpal)
     let lowerDiag = hand.jointPosition(.littleFingerMetacarpal) - hand.jointPosition(.indexFingerKnuckle)
     let palmOrientation = normalize(cross(upperDiag, lowerDiag))
-    if dot(palmOrientation, normal) < 0 {
-      normal = -normal
+    if dot(palmOrientation, palmNormal) < 0 {
+      palmNormal = -palmNormal
     }
 
-    // Bias the normal towards where the user is facing
-    normal = 0.6 * normal + 0.4 * deviceTransform.rotation.act([0, 0, -1])
+    // Selection direction is a combination of:
+    // 1. Hand direction relative to head
+    // 2. Palm facing direction
+    // 3. Device orientation (where the user's face is heading)
+    let direction = normalize(
+      0.4 * normalize(handPosition - devicePosition) +
+      0.4 * palmNormal + 0.2 * deviceTransform.rotation.act([0, 1, 0]))
 
-    // Detect finger angle
+    // Detect palm angle
     // TODO: this is not quite what we wanted when the hand is not perpendicular to the device
     let fingerTips: [HandSkeleton.JointName] = [.thumbTip, .indexFingerTip, .middleFingerTip,
                                                 .ringFingerTip, .littleFingerTip];
@@ -89,7 +96,7 @@ class GestureDetector {
     }
     avgStraightness /= 5
 
-    return (centroid, normal, maxAngle, avgStraightness)
+    return (palmCenter, direction, maxAngle, avgStraightness)
   }
 
   private func palmPlane(_ hand: HandAnchor) -> (centroid: SIMD3<Float>, normal: SIMD3<Float>) {

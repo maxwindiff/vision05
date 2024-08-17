@@ -4,17 +4,26 @@ import SwiftUI
 import RealityKit
 import RealityKitContent
 
-let DEBUG = 0
+let DEBUG = 1
 
 class UnitEntity: RealityKit.Entity {
+  enum State {
+    case undefined
+    case unselected
+    case highlighted
+    case selected
+  }
+
   var model: Entity
   var debugView: ModelEntity?
+  var state: State = .undefined
 
   required init(model: Entity) {
     self.model = model
 
     super.init()
     addChild(model)
+    setState(.unselected)
 
     if DEBUG >= 2 {
       debugView = ModelEntity(
@@ -51,21 +60,30 @@ class UnitEntity: RealityKit.Entity {
     return material
   }
 
-  func highlightSelected() {
-    if let highlight = model.findEntity(named: "SelectionHighlight") {
-      highlight.isEnabled = true
+  func setState(_ state: State) {
+    if state == self.state {
+      return
     }
-  }
+    self.state = state
 
-  func highlightSelecting() {
-    if let highlight = model.findEntity(named: "SelectionHighlight") {
-      highlight.isEnabled = true
-    }
-  }
+    guard
+      let highlight = model.findEntity(named: "SelectionHighlight") as? ModelEntity,
+      var highlightMaterial = highlight.model?.materials.first as? ShaderGraphMaterial
+    else { return }
 
-  func unhighlight() {
-    if let highlight = model.findEntity(named: "SelectionHighlight") {
+    switch state {
+    case .undefined:
+      fatalError("Cannot set state to undefined")
+    case .unselected:
       highlight.isEnabled = false
+    case .highlighted:
+      highlight.isEnabled = true
+      try? highlightMaterial.setParameter(name: "Color", value: .color(.yellow))
+      highlight.model?.materials = [highlightMaterial]
+    case .selected:
+      highlight.isEnabled = true
+      try? highlightMaterial.setParameter(name: "Color", value: .color(.red))
+      highlight.model?.materials = [highlightMaterial]
     }
   }
 }
@@ -111,20 +129,21 @@ struct ImmersiveView: View {
       }
 
       if DEBUG >= 1 {
-        leftHand = HandSkeletonView(jointColor: .red, connectionColor: .red.withAlphaComponent(0.5))
-        rightHand = HandSkeletonView(jointColor: .blue, connectionColor: .blue.withAlphaComponent(0.5))
-        content.add(leftHand!)
-        content.add(rightHand!)
-
         debugCone = try? await Entity(named: "Debug", in: realityKitContentBundle)
         if let debugCone {
           content.add(debugCone)
         }
       }
+      if DEBUG >= 2 {
+        leftHand = HandSkeletonView(jointColor: .red, connectionColor: .red.withAlphaComponent(0.5))
+        rightHand = HandSkeletonView(jointColor: .blue, connectionColor: .blue.withAlphaComponent(0.5))
+        content.add(leftHand!)
+        content.add(rightHand!)
+      }
     } update: { content, attachments in
       if selectionState == .notSelecting {
         for unit in units {
-          unit.unhighlight()
+          unit.setState(.unselected)
         }
       } else {
         for unit in units {
@@ -132,12 +151,12 @@ struct ImmersiveView: View {
           let angle = acos(dot(selectionDirection, unitDirection))
           if angle < selectionAngle {
             if selectionState == .selected {
-              unit.highlightSelected()
+              unit.setState(.selected)
             } else if selectionState == .selecting {
-              unit.highlightSelecting()
+              unit.setState(.highlighted)
             }
           } else {
-            unit.unhighlight()
+            unit.setState(.unselected)
           }
         }
       }
@@ -198,7 +217,7 @@ struct ImmersiveView: View {
     // TODO: Support both hands for selection
     if hand.chirality == .right {
       // TODO: instead of using palm center, should use some other kind of center of the hand
-      (palmCenter, palmDirection, palmAngle, straightness) = gestureDetector.isSelecting(device, hand)
+      (palmCenter, palmDirection, palmAngle, straightness) = gestureDetector.detect(device, hand)
       (selectionState, selectionCenter, selectionAngle, selectionDirection) = selectionTracker.update(
         timestamp: CACurrentMediaTime(),
         center: palmCenter,
@@ -223,7 +242,8 @@ struct ImmersiveView: View {
                              """,
                              deviceTransform.translation.shortDesc,
                              deviceTransform.rotation.act([0, 0, -1]).shortDesc,
-                             palmCenter.shortDesc, palmDirection.shortDesc,
+                             palmCenter.shortDesc,
+                             palmDirection.shortDesc,
                              palmAngle * 180.0 / .pi)
       appModel.log2 = String(format: """
                              straightness: %.2f
@@ -236,15 +256,18 @@ struct ImmersiveView: View {
     }
 
     if DEBUG >= 1 {
-      if hand.chirality == .left {
-        leftHand?.updateHandSkeleton(with: hand)
-      } else {
-        rightHand?.updateHandSkeleton(with: hand)
-
+      if hand.chirality == .right {
         let coneHeight: Float = 2.0
         let coneRadius = tan(palmAngle) * coneHeight
         debugCone?.look(at: palmCenter + palmDirection, from: palmCenter, relativeTo: nil)
         debugCone?.scale = [coneRadius, coneRadius, coneHeight]
+      }
+    }
+    if DEBUG >= 2 {
+      if hand.chirality == .left {
+        leftHand?.updateHandSkeleton(with: hand)
+      } else {
+        rightHand?.updateHandSkeleton(with: hand)
       }
     }
   }
