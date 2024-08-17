@@ -1,7 +1,7 @@
 {
   "advancedEditorSelectedIdentifier" : "ShaderGraphEditorPluginID",
   "openSceneRelativePaths" : [
-    "BasicUnit.usda"
+
   ],
   "recentIdentifiers" : {
     "AF09ED6F-1707-48FD-8720-65B998362C09" : [
@@ -593,6 +593,5 @@
   },
   "sceneViewportBackgroundColors" : {
 
-  },
-  "selectedSceneRelativePath" : "BasicUnit.usda"
+  }
 }
