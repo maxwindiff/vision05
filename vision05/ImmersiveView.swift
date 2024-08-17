@@ -4,7 +4,7 @@ import SwiftUI
 import RealityKit
 import RealityKitContent
 
-let DEBUG = 1
+let DEBUG = 0
 
 class UnitEntity: RealityKit.Entity {
   enum State {
@@ -105,6 +105,7 @@ struct ImmersiveView: View {
   @State var deviceTransform: Transform = .identity
   @State var palmCenter: SIMD3<Float> = [0, 0, 0]
   @State var palmDirection: SIMD3<Float> = [0, 0, 0]
+  @State var palmRadius: Float = 0
   @State var palmAngle: Float = 0
   @State var straightness: Float = 0
 
@@ -112,6 +113,7 @@ struct ImmersiveView: View {
   @State var selectionState: SelectionTracker.State = .notSelecting
   @State var selectionRingVisibility: Float = 0
   @State var selectionCenter: SIMD3<Float> = [0, 0, 0]
+  @State var selectionRadius: Float = 0
   @State var selectionAngle: Float = 0
   @State var selectionDirection: SIMD3<Float> = [0, 0, 0]
 
@@ -217,10 +219,11 @@ struct ImmersiveView: View {
     // TODO: Support both hands for selection
     if hand.chirality == .right {
       // TODO: instead of using palm center, should use some other kind of center of the hand
-      (palmCenter, palmDirection, palmAngle, straightness) = gestureDetector.detect(device, hand)
-      (selectionState, selectionCenter, selectionAngle, selectionDirection) = selectionTracker.update(
+      (palmCenter, palmDirection, palmRadius, palmAngle, straightness) = gestureDetector.detect(device, hand)
+      (selectionState, selectionCenter, selectionRadius, selectionAngle, selectionDirection) = selectionTracker.update(
         timestamp: CACurrentMediaTime(),
         center: palmCenter,
+        radius: palmRadius,
         angle: palmAngle,
         direction: palmDirection,
         straightness: straightness
@@ -249,10 +252,16 @@ struct ImmersiveView: View {
                              straightness: %.2f
                              selectionState: %@
                              selectionCenter: %@
+                             selectionRadius: %.2f
                              selectionAngle: %.2f
                              selectionRingVisibility: %.2f
-                             """, straightness, selectionState.description,
-                             selectionCenter.shortDesc, selectionAngle, selectionRingVisibility)
+                             """,
+                             straightness,
+                             selectionState.description,
+                             selectionCenter.shortDesc,
+                             selectionRadius,
+                             selectionAngle,
+                             selectionRingVisibility)
     }
 
     if DEBUG >= 1 {

@@ -22,6 +22,7 @@ class SelectionTracker {
   private struct Record {
     let timestamp: Double
     let center: SIMD3<Float>
+    let radius: Float
     let angle: Float
     let direction: SIMD3<Float>
     let straightness: Float
@@ -30,11 +31,14 @@ class SelectionTracker {
   private var state: State = .notSelecting
   private var selection: Record?
 
-  func update(timestamp: Double, center: SIMD3<Float>, angle: Float, direction: SIMD3<Float>, straightness: Float) -> (State, SIMD3<Float>, Float, SIMD3<Float>) {
+  func update(timestamp: Double, center: SIMD3<Float>, radius: Float,
+              angle: Float, direction: SIMD3<Float>, straightness: Float) ->
+    (state: State, center: SIMD3<Float>, radius: Float, angle: Float, direction: SIMD3<Float>) {
     addRecord(
       Record(
         timestamp: timestamp,
         center: center,
+        radius: radius,
         angle: angle,
         direction: direction,
         straightness: straightness
@@ -64,16 +68,17 @@ class SelectionTracker {
 
     switch state {
     case .notSelecting:
-      return (state, [0, 0, 0], 0, [0, 0, 0])
+      return (state, [0, 0, 0], 0, 0, [0, 0, 0])
 
     case .selecting:
       let averageCenter = records.reduce([0, 0, 0]) { $0 + $1.center } / Float(records.count)
+      let averageRadius = records.reduce(0) { $0 + $1.radius } / Float(records.count)
       let averageAngle = records.reduce(0) { $0 + $1.angle } / Float(records.count)
       let averageDirection = records.reduce([0, 0, 0]) { $0 + $1.direction } / Float(records.count)
-      return (state, averageCenter, averageAngle, averageDirection)
+      return (state, averageCenter, averageRadius, averageAngle, averageDirection)
 
     case .selected:
-      return (state, selection!.center, selection!.angle, selection!.direction)
+      return (state, selection!.center, selection!.radius, selection!.angle, selection!.direction)
     }
   }
 

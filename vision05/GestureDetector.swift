@@ -45,8 +45,9 @@ class GestureDetector {
   ]
 
   func detect(_ device: DeviceAnchor, _ hand: HandAnchor) -> (
-    centroid: SIMD3<Float>,
+    center: SIMD3<Float>,
     normal: SIMD3<Float>,
+    radius: Float,
     angle: Float,
     straightness: Float
   ) {
@@ -56,7 +57,7 @@ class GestureDetector {
     let handPosition = handTransform.translation
 
     // Detect the palm plane, and try to orient the normal to face "outwards".
-    var (palmCenter, palmNormal) = palmPlane(hand)
+    var (palmCenter, palmNormal, palmRadius) = fitCircleToPalm(hand)
     let upperDiag = hand.jointPosition(.littleFingerKnuckle) - hand.jointPosition(.indexFingerMetacarpal)
     let lowerDiag = hand.jointPosition(.littleFingerMetacarpal) - hand.jointPosition(.indexFingerKnuckle)
     let palmOrientation = normalize(cross(upperDiag, lowerDiag))
@@ -96,16 +97,17 @@ class GestureDetector {
     }
     avgStraightness /= 5
 
-    return (palmCenter, direction, maxAngle, avgStraightness)
+    return (palmCenter, direction, palmRadius, maxAngle, avgStraightness)
   }
 
-  private func palmPlane(_ hand: HandAnchor) -> (centroid: SIMD3<Float>, normal: SIMD3<Float>) {
+  private func fitCircleToPalm(_ hand: HandAnchor) -> (centroid: SIMD3<Float>, normal: SIMD3<Float>, radius: Float) {
     var points: [SIMD3<Float>] = []
     for joint in palmJoints {
       points.append(hand.jointPosition(joint))
     }
     let centroid = points.reduce([0, 0, 0]) { $0 + $1 } / Float(points.count)
     let centeredPoints = points.map { $0 - centroid }
+    let maxLength = centeredPoints.map { length($0) }.max()!
 
     var covMatrix = simd_float3x3(0.0)
     for point in centeredPoints {
@@ -118,7 +120,7 @@ class GestureDetector {
     covMatrix.columns.2 /= Float(points.count)
 
     let (_, vectors) = eigen(covMatrix)
-    return (centroid, vectors[0])
+    return (centroid, vectors[0], maxLength)
   }
 
   func eigen(_ matrix: simd_float3x3) -> (eigenvalues: SIMD3<Float>, eigenvectors: simd_float3x3) {
